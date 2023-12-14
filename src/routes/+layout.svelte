@@ -1,24 +1,17 @@
 <script lang="ts">
-	import '../app.postcss';
-	import {ConicGradient , AppShell, AppBar } from '@skeletonlabs/skeleton';
-	import { page } from '$app/stores';
-	import { localStorageStore ,getDrawerStore ,Drawer,AppRail, AppRailTile, AppRailAnchor } from '@skeletonlabs/skeleton';
-	import { LightSwitch } from '@skeletonlabs/skeleton';
-	let currentTile = 0;
-	import {Toast, getToastStore, Modal,getModalStore } from '@skeletonlabs/skeleton';
-	import { initializeStores } from '@skeletonlabs/skeleton';
-	import type { Writable } from 'svelte/store';
-	import type {DrawerSettings,ConicStop ,ToastSettings, ToastStore , ModalSettings, ModalComponent } from '@skeletonlabs/skeleton';
-	import icono from '../lib/img/icono5.png'
+	import type { ConicStop, DrawerSettings, ModalSettings, ToastSettings } from '@skeletonlabs/skeleton';
+	import { AppBar, AppRail, AppRailAnchor, AppShell, Drawer, LightSwitch, Toast, getDrawerStore, getModalStore, getToastStore, initializeStores, localStorageStore } from '@skeletonlabs/skeleton';
 	import { onMount } from 'svelte';
-	import { apertura } from '../lib/stores/storesApertura.js';
+	import type { Writable } from 'svelte/store';
+	import '../app.postcss';
+	import icono from '../lib/img/icono5.png';
+	import { apertura, toasterAbierto } from '../lib/stores/storesApertura.js';
 	import { iniciaTimer } from '../lib/stores/storesTimer.js';
 
  
 	
 
-	import { get } from 'svelte/store';
-	let ruta = "/examen";
+		let ruta = "/examen";
 
 	initializeStores();	
 	const toastStore = getToastStore();
@@ -154,7 +147,7 @@ function triggerStyled(): void {
 	
 			
 		}else{
-			apertura.set(true);
+			apertura.set(false);
 		}
 		cargado = false;
 		// Additional actions with the response
@@ -183,8 +176,11 @@ $: positionClasses = $drawerStore.open || cargado ? 'blur' : '';
 $: iniciarTimer(positionClasses);
 
 function iniciarTimer(positionClasses:any){
+	
 	if(positionClasses != 'blur'){
 		iniciaTimer.set(true);
+	}else{
+		iniciaTimer.set(false);
 	}
 }
 
@@ -192,9 +188,22 @@ $: onChange($drawerStore.open);
 function toastConfirmacion(mensaje:any){
 	const t: ToastSettings = {
 	message: mensaje,
+	background: 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 text-white',
+	classes: 'border-4 border-purple-500',
+	hideDismiss: false,
+	hoverable: true,
 	action: {
 		label: 'Abrir',
-		response: () => triggerStyled()
+		
+		response: () => {
+                triggerStyled();
+                
+                // You can add more commands here if needed
+            }
+	},
+	callback: (response) => {
+		if (response.status === 'queued')toasterAbierto.set(true);
+		if (response.status === 'closed') toasterAbierto.set(false);
 	},
 	timeout: 10000
 	};
@@ -210,7 +219,7 @@ function toast(mensaje:any){
 function onChange(flagDrawer:any){
 	if(!flagDrawer && trigger ){
 		toastConfirmacion("Vuelve y cuentame tu dia :)");
-		console.log("hello"+flagDrawer);
+		toasterAbierto.set(true);
 		return;
 	}
 	trigger = true;
@@ -289,7 +298,7 @@ $: buttonText = audioSrc && !recording ? 'Terminar' : 'Detener';
 			<svelte:fragment slot="trail">
 				<a
 					class="btn btn-sm variant-ghost-surface"
-					href="https://discord.gg/XkEnfXyq"
+					href="https://discord.gg/NqqDnm9UYX"
 					target="_blank"
 					rel="noreferrer"
 				>
@@ -305,7 +314,7 @@ $: buttonText = audioSrc && !recording ? 'Terminar' : 'Detener';
 				</a>
 				<a
 					class="btn btn-sm variant-ghost-surface"
-					href="https://github.com/somadevmcc"
+					href="https://github.com/somadevmcc/ambienteEducativoFront"
 					target="_blank"
 					rel="noreferrer"
 				>

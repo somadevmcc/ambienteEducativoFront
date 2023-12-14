@@ -1,22 +1,19 @@
 <script lang="ts">
-    import {Drawer, getDrawerStore ,getToastStore ,Modal, getModalStore } from '@skeletonlabs/skeleton';
-	import type { DrawerSettings, DrawerStore,ToastSettings,ToastStore ,ModalSettings, ModalComponent } from '@skeletonlabs/skeleton';
-	import {onMount} from "svelte";
-	import ModalComponentOne from '../../lib/Modal/ModalExampleList.svelte';
-	import modalComponentTwo from '../../lib/Modal/ModalUrl.svelte';
-	import { Stepper, Step,SlideToggle,ListBox, ListBoxItem  } from '@skeletonlabs/skeleton';
-	import type { SvelteComponent } from 'svelte';
-	import {getContext} from 'svelte';
-	import { iniciaTimer } from '../../lib/stores/storesTimer.js';
-	import { apertura } from '../../lib/stores/storesApertura.js';
-	import { onDestroy } from 'svelte';
+    import type { DrawerSettings, ModalComponent, ModalSettings, ToastSettings } from '@skeletonlabs/skeleton';
+    import { ListBox, ListBoxItem, Modal, Step, Stepper, getDrawerStore, getModalStore, getToastStore } from '@skeletonlabs/skeleton';
+    import type { SvelteComponent } from 'svelte';
+    import { onDestroy } from 'svelte';
+    import ModalComponentOne from '../../lib/Modal/ModalExampleList.svelte';
+    import modalComponentTwo from '../../lib/Modal/ModalUrl.svelte';
+    import { apertura,toasterAbierto } from '../../lib/stores/storesApertura.js';
+    import { iniciaTimer } from '../../lib/stores/storesTimer.js';
 
 
 	let elapsed = 0;
 	let duration = 5000;
 	let interval:any;
 	let timerPregunta:any = 0;
-	
+	let ayudas = 0;
 
   interface Timer {
     id: any;
@@ -63,7 +60,7 @@ function resumeTimerPreguntas(index: number) {
         const resumedTimer: Timer = {
             id: setInterval(() => {
                 timers[index].elapsed += 100;
-                console.log('Timer', timers[index].elapsed);
+                
             }, 100),
             elapsed: timers[index].elapsed,
             isRunning: true,
@@ -91,6 +88,7 @@ onDestroy(() => {
 	function stopTimer() {
 		clearInterval(interval);
 		interval = null;
+		
 	}
 	function resetTimer() {
 		clearInterval(interval);
@@ -114,7 +112,13 @@ onDestroy(() => {
 		modalComponentTwo: { ref: modalComponentTwo }
 	}
 	let flagApertura = false;
-	
+	let flagToast = false;
+	toasterAbierto.subscribe(value => {
+		flagToast = value; // cambiar luego
+		//flagToast = false;
+		
+	});
+
 	apertura.subscribe(value => {
 		flagApertura = value;
 		
@@ -127,8 +131,11 @@ onDestroy(() => {
 			startTimer();
 			startTimerPreguntas(0);
 		}else{
-			stopTimer();
-			stopTimerPreguntas(0);
+			
+			resetTimer();
+			resetTimerPreguntas(0);
+			
+			
 		}
 	});
 		
@@ -183,7 +190,7 @@ function modalAyuda(flag:boolean,mensaje:string):void{
 }
 
 function modalurl(flag:boolean,url:string){
-	console.log(url);
+	
 	if (flag) {
 		const modalurl: ModalSettings ={
 	type: 'component',
@@ -232,7 +239,6 @@ const modal: ModalSettings = {
 			.then((response) => response.json())
 			.then((data) => {
 				arrayPreguntas = data.preguntas;
-				console.log(arrayPreguntas);
 				timer = true;
 				resetTimer();
 				startTimer();
@@ -269,20 +275,20 @@ let locked = true;
 
 function onNextHandler(e: CustomEvent): void {
 	
-	index = (e.detail.step+1);
-	console.log(timers[e.detail.step]);
+	index = (e.detail.step);
 
 
 	timerPregunta = timers[e.detail.step].elapsed;
 	
-	stopTimerPreguntas(e.detail.step);
+	stopTimerPreguntas(index);
+	startTimerPreguntas(index+1);
 	timerPregunta = timers[e.detail.step].elapsed;
 	groupRespuestas[e.detail.step] = {res: respuesta, timer: timerPregunta };
 	
 	
 
-	if (groupRespuestas[index] != undefined && groupRespuestas[index] != false && groupRespuestas[index] != '')  {
-		respuesta = groupRespuestas[index].res;
+	if (groupRespuestas[index+1] != undefined && groupRespuestas[index+1] != false && groupRespuestas[index+1] != '')  {
+		respuesta = groupRespuestas[index+1].res;
 	}else{
 		respuesta = '';
 	}
@@ -290,36 +296,140 @@ function onNextHandler(e: CustomEvent): void {
 	
 }
 function onBackHandler(e: CustomEvent): void {
+	index = (e.detail.step);
+	timerPregunta = timers[e.detail.step].elapsed;
+	stopTimerPreguntas(index);
+	startTimerPreguntas(index-1);
+
 	if(respuesta != undefined && respuesta != ''){
-		groupRespuestas[e.detail.step] = {res: respuesta, timer: timerPregunta };
+		groupRespuestas[index] = {res: respuesta, timer: timerPregunta };
 	}
-	respuesta = groupRespuestas[(e.detail.step-1)].res;
+	
+	if (groupRespuestas[(index-1)] != undefined && groupRespuestas[(index-1)] != false && groupRespuestas[(index-1)] != ''){
+		respuesta = groupRespuestas[(index-1)].res;
+	}else{
+		respuesta = '';
+	}
+	
 }
 
-function onCompleteHandler(e: CustomEvent): void {
-	console.log('event:complete', e.detail);
-	groupRespuestas[e.detail.step] = respuesta;
+	function onCompleteHandler(e: CustomEvent): void {
+		
+		index = (e.detail.step);
+		timerPregunta = timers[e.detail.step].elapsed;
 
-	for (let index = 0; index < groupRespuestas.length; index++) {
-		if(groupRespuestas[index] === undefined || groupRespuestas[index] === false || groupRespuestas[index] === ''){
-			return toast('Prgunta #'+(index+1)+' esta sin responder');
+		groupRespuestas[e.detail.step] = {res: respuesta, timer: timerPregunta };
+
+		
+
+		for (let index = 0; index < groupRespuestas.length; index++) {
+			if(groupRespuestas[index].res === undefined || groupRespuestas[index].res === false || groupRespuestas[index].res === ''){
+				return toast('Prgunta #'+(index+1)+' esta sin responder');
+				
+			}
 			
 		}
 		
-	}
-	
 		
+			
+		
+		
+		mensaje = 'Terminastes!!';
+		visible = true;
+		stopTimer();
+		stopTimerPreguntas(index);
+
+
+		toast(mensaje);
+		fuzzy();
+
 	
-	console.log(groupRespuestas);
-	console.log(respuesta);
-	mensaje = 'Terminastes!!';
-	visible = true;
-	toast(mensaje);
-	stopTimer();
-}
-function triggerAction(): void {
-		alert('The "Action" button was pressed!');
 	}
+
+	function fuzzy(){
+		let numCorrectas = contarRespuestas();
+		let nivelFinal = 0;
+		let tiempo = elapsed/1000;
+		let json = {
+			"consecuencia": "nivel",
+			"input": [
+				{
+					"nombre": "tiempo",
+					"valor": tiempo
+				},
+				{
+					"nombre": "respuesta",
+					"valor": numCorrectas
+				},
+				{
+					"nombre": "ayuda",
+					"valor": ayudas
+				}
+			]
+		};
+
+		fetch("http://localhost:8000/fuzzy", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+    },
+    body: JSON.stringify(json),
+})
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        nivelFinal = data;
+        toast("¡Felicidades! Tu nivel es: " + nivelFinal);
+
+        // Second fetch call
+        const secondJson = {
+            "nivel": nivelFinal,
+            "idusuario": userId,
+            "materia": materiaid
+        };
+
+        return fetch("http://localhost:8000/guardarnivel", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(secondJson),
+        });
+		})
+		.then(response => {
+			if (!response.ok) {
+				throw new Error('Network response was not ok');
+			}
+			return response.json();
+		})
+		.then(() => {
+			toast("Datos guardados correctamente");
+			setTimeout(() => {
+				window.location.href = "/";
+			}, 5000);
+			
+		})
+		.catch(error => {
+			console.error('Error:', error);
+		});
+
+
+	}
+	function contarRespuestas(){
+		let contador = 0;
+		for (let index = 0; index < groupRespuestas.length; index++) {
+			if(arrayPreguntas[index].respuestas[(arrayPreguntas[index].correcta-1)] == groupRespuestas[index].res){
+				contador++;
+			}
+			
+		}
+		return contador;
+	}
+
 </script>
   <Modal components={modalRegistry} />
  {#if flagTimer && timer}
@@ -336,7 +446,7 @@ function triggerAction(): void {
 	<Stepper stepTerm='Pregunta' buttonBackLabel ='← Anterior' buttonNextLabel='Siguiente →' buttonCompleteLabel='Terminar' on:next={onNextHandler} on:back={onBackHandler} on:complete={onCompleteHandler}>
 
 		{#each arrayPreguntas as index }
-			<Step >
+			<Step locked={flagToast}>
 				<svelte:fragment slot="header">{index.pregunta}</svelte:fragment>
 				<ListBox>
 					{#if flag}
@@ -347,8 +457,8 @@ function triggerAction(): void {
 				</ListBox>
 				{#if flagApertura}
 					<footer class=" ">
-						<button class="btn bg-gradient-to-br variant-gradient-tertiary-primary" on:click={() => modalAyuda(true,index.ayuda)}>Ayuda</button>
-						<button class="btn bg-gradient-to-br variant-gradient-secondary-tertiary" on:click={() => modalurl(true,index.videourl)} >Video</button>
+						<button class="btn bg-gradient-to-br variant-gradient-tertiary-primary" on:click={() => {modalAyuda(true,index.ayuda); ayudas++;}}>Ayuda</button>
+						<button class="btn bg-gradient-to-br variant-gradient-secondary-tertiary" on:click={() => {modalurl(true,index.videourl); ayudas++}} >Video</button>
 					</footer>
 				{/if}
 			</Step> 
